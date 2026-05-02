@@ -96,6 +96,30 @@ export default function CustomerListPage({ onNavigate }) {
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const deferredSearch = useDeferredValue(filters.search);
+  const customerQueryFilters = useMemo(
+    () => ({
+      search: deferredSearch,
+      segment: filters.segment,
+      status: filters.status,
+      platform: filters.platform,
+      lastOrder: filters.lastOrder,
+      sortBy: filters.sortBy,
+      sortDir: filters.sortDir,
+      page: filters.page,
+      pageSize: filters.pageSize
+    }),
+    [
+      deferredSearch,
+      filters.lastOrder,
+      filters.page,
+      filters.pageSize,
+      filters.platform,
+      filters.segment,
+      filters.sortBy,
+      filters.sortDir,
+      filters.status
+    ]
+  );
 
   const loadCustomers = useCallback(async (nextFilters = DEFAULT_FILTERS) => {
     setLoading(true);
@@ -115,22 +139,8 @@ export default function CustomerListPage({ onNavigate }) {
   }, []);
 
   useEffect(() => {
-    loadCustomers({
-      ...filters,
-      search: deferredSearch
-    });
-  }, [
-    deferredSearch,
-    filters.lastOrder,
-    filters.page,
-    filters.pageSize,
-    filters.platform,
-    filters.segment,
-    filters.sortBy,
-    filters.sortDir,
-    filters.status,
-    loadCustomers
-  ]);
+    loadCustomers(customerQueryFilters);
+  }, [customerQueryFilters, loadCustomers]);
 
   const handleFilterChange = (key, value) => {
     startTransition(() => {
@@ -183,10 +193,7 @@ export default function CustomerListPage({ onNavigate }) {
 
       setFormOpen(false);
       setEditingCustomer(null);
-      await loadCustomers({
-        ...filters,
-        search: deferredSearch
-      });
+      await loadCustomers(customerQueryFilters);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to save customer.");
     } finally {
@@ -214,10 +221,7 @@ export default function CustomerListPage({ onNavigate }) {
 
       setImportOpen(false);
       setImportFile(null);
-      await loadCustomers({
-        ...filters,
-        search: deferredSearch
-      });
+      await loadCustomers(customerQueryFilters);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to import customers.");
     } finally {
@@ -255,7 +259,7 @@ export default function CustomerListPage({ onNavigate }) {
         {error ? (
           <ErrorPanel
             description={error}
-            action={<PrimaryButton onClick={() => loadCustomers({ ...filters, search: deferredSearch })}>Retry</PrimaryButton>}
+            action={<PrimaryButton onClick={() => loadCustomers(customerQueryFilters)}>Retry</PrimaryButton>}
           />
         ) : null}
 
