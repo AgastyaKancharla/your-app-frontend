@@ -2,21 +2,27 @@ import { render, screen } from "@testing-library/react";
 import axios from "axios";
 import App from "./App";
 
-jest.mock("axios", () => ({
-  defaults: {},
-  get: jest.fn(),
-  post: jest.fn(),
-  interceptors: {
-    request: {
-      use: jest.fn(() => 1),
-      eject: jest.fn()
-    },
-    response: {
-      use: jest.fn(() => 1),
-      eject: jest.fn()
+jest.mock("axios", () => {
+  const mockAxios = {
+    defaults: {},
+    get: jest.fn(),
+    post: jest.fn(),
+    interceptors: {
+      request: {
+        use: jest.fn(() => 1),
+        eject: jest.fn()
+      },
+      response: {
+        use: jest.fn(() => 1),
+        eject: jest.fn()
+      }
     }
-  }
-}));
+  };
+
+  mockAxios.create = jest.fn(() => mockAxios);
+
+  return mockAxios;
+});
 
 beforeEach(() => {
   axios.get.mockRejectedValue({ response: { status: 401 } });

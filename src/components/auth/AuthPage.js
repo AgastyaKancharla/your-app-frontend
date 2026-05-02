@@ -1,11 +1,10 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "../../config/axios";
 import {
   COMPANY_NAME,
   COMPANY_PROBLEM_STATEMENT,
   COMPANY_TAGLINE
 } from "../../branding";
-import API_URL from "../../config/api";
 
 const ENABLE_SUPER_ADMIN_LOGIN =
   String(process.env.REACT_APP_ENABLE_SUPER_ADMIN_LOGIN || "false").toLowerCase() ===
@@ -446,28 +445,34 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/login`,
-        JSON.stringify({
+      const response = await api.post(
+        "/api/auth/login",
+        {
           email,
           password
-        }),
+        },
         AUTH_REQUEST_CONFIG
       );
+      console.log(response.data);
 
-      if (res.data?.otpRequired) {
+      if (response.data?.otpRequired) {
         startOtpFlow({
           email,
           password,
-          responseData: res.data
+          responseData: response.data
         });
         return;
       }
 
+      if (!response.data?.success) {
+        showError(response.data?.message || "Unable to login");
+        return;
+      }
+
       onAuthSuccess?.({
-        token: res.data?.token,
-        refreshToken: res.data?.refreshToken,
-        user: res.data?.user
+        token: response.data?.token,
+        refreshToken: response.data?.refreshToken,
+        user: response.data?.user
       });
 
       setLoginForm(loginInitial);
@@ -486,7 +491,7 @@ export default function AuthPage({
 
       if (!err.response) {
         showError(
-          `Cannot reach auth server at ${API_URL}. Set REACT_APP_API_URL correctly.`
+          `Cannot reach auth server at ${process.env.REACT_APP_API_URL}. Set REACT_APP_API_URL correctly.`
         );
         return;
       }
@@ -510,8 +515,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/verify-login-otp`,
+      const res = await api.post(
+        "/api/auth/verify-login-otp",
         {
           email,
           code,
@@ -550,8 +555,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/verify-email`,
+      const res = await api.post(
+        "/api/auth/verify-email",
         {
           email,
           code
@@ -589,8 +594,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/login`,
+      const res = await api.post(
+        "/api/auth/login",
         {
           email,
           password
@@ -650,8 +655,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/signup`,
+      const res = await api.post(
+        "/api/auth/signup",
         JSON.stringify({
           restaurantName,
           businessType,
@@ -702,8 +707,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/forgot-password/request`,
+      const res = await api.post(
+        "/api/auth/forgot-password/request",
         {
           identifier
         },
@@ -752,8 +757,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/forgot-password/verify`,
+      const res = await api.post(
+        "/api/auth/forgot-password/verify",
         {
           identifier,
           code,
@@ -793,8 +798,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/forgot-username/request`,
+      const res = await api.post(
+        "/api/auth/forgot-username/request",
         {
           identifier
         },
@@ -831,8 +836,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/forgot-username/verify`,
+      const res = await api.post(
+        "/api/auth/forgot-username/verify",
         {
           identifier,
           code,
@@ -873,8 +878,8 @@ export default function AuthPage({
     clearFeedback();
 
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/super-admin/login`,
+      const res = await api.post(
+        "/api/auth/super-admin/login",
         {
           email,
           password
