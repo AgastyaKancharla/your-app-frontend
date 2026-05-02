@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
 import { formatOrderStatus, normalizeOrderStatus } from "../access";
@@ -24,7 +24,7 @@ export default function DeliveryManagement() {
   const [savingOrderId, setSavingOrderId] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${API_BASE_URL}/api/delivery`);
@@ -47,13 +47,13 @@ export default function DeliveryManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setOrders]);
 
   useEffect(() => {
     loadOrders();
     const interval = setInterval(loadOrders, 8000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadOrders]);
 
   const orders = useMemo(
     () =>

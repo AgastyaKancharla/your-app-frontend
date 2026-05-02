@@ -302,7 +302,7 @@ export default function InventorySystem() {
     } finally {
       setLoading(false);
     }
-  }, [activeConfig.endpoint, activeTab, search, statusFilter]);
+  }, [activeConfig.endpoint, activeTab, search, setRows, statusFilter]);
 
   useEffect(() => {
     setStatusFilter("ALL");

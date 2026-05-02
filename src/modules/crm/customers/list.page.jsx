@@ -97,7 +97,7 @@ export default function CustomerListPage({ onNavigate }) {
   const [importing, setImporting] = useState(false);
   const deferredSearch = useDeferredValue(filters.search);
 
-  const loadCustomers = useCallback(async (nextFilters = filters) => {
+  const loadCustomers = useCallback(async (nextFilters = DEFAULT_FILTERS) => {
     setLoading(true);
     setError("");
 
@@ -112,7 +112,7 @@ export default function CustomerListPage({ onNavigate }) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   useEffect(() => {
     loadCustomers({
@@ -142,11 +142,11 @@ export default function CustomerListPage({ onNavigate }) {
     });
   };
 
-  const openCreateModal = () => {
+  const openCreateModal = useCallback(() => {
     setEditingCustomer(null);
     setCustomerForm(createEmptyCustomerForm());
     setFormOpen(true);
-  };
+  }, []);
 
   const openEditModal = (customer) => {
     setEditingCustomer(customer);
@@ -225,7 +225,7 @@ export default function CustomerListPage({ onNavigate }) {
     }
   };
 
-  const currentItems = response.items || [];
+  const currentItems = useMemo(() => response.items || [], [response.items]);
   const pagination = response.pagination || EMPTY_RESPONSE.pagination;
   const filterOptions = response.filters || EMPTY_RESPONSE.filters;
 
@@ -237,7 +237,7 @@ export default function CustomerListPage({ onNavigate }) {
         <SecondaryButton onClick={() => exportCustomersAsCsv(currentItems)}>Export</SecondaryButton>
       </>
     ),
-    [currentItems]
+    [currentItems, openCreateModal]
   );
 
   if (loading && !currentItems.length) {
