@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-import { API_BASE_URL } from "../../config";
+import API_URL from "../../config/api";
 
 export const CLOUD_KITCHEN_STATUS_FLOW = ["NEW", "PREPARING", "READY", "DISPATCHED"];
 
@@ -127,19 +127,11 @@ export const deriveCategories = (menuItems = []) => {
 };
 
 const resolveSocketOrigin = () => {
-  if (API_BASE_URL) {
-    try {
-      return new URL(API_BASE_URL).origin;
-    } catch {
-      return API_BASE_URL;
-    }
+  try {
+    return new URL(API_URL).origin;
+  } catch {
+    return API_URL;
   }
-
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:5000`;
-  }
-
-  return "";
 };
 
 export const connectOrdersSocket = (tenantId) => {

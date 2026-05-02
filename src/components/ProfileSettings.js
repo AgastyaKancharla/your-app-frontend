@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
 import { STAFF_ROLE_OPTIONS, formatRoleLabel } from "../access";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 import { useAuthStore } from "../store/authStore";
 import { hasPermission } from "../utils/permissionEngine";
 
@@ -93,7 +93,7 @@ export default function ProfileSettings({
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/profile`);
+      const res = await axios.get(`${API_URL}/api/profile`);
       hydrateForms(res.data || {});
     } catch (err) {
       console.error(err);
@@ -146,7 +146,7 @@ export default function ProfileSettings({
 
     try {
       setSavingMyProfile(true);
-      const res = await axios.put(`${API_BASE_URL}/api/profile/me`, {
+      const res = await axios.put(`${API_URL}/api/profile/me`, {
         name,
         phone
       });
@@ -183,7 +183,7 @@ export default function ProfileSettings({
 
     try {
       setSavingRestaurant(true);
-      const res = await axios.put(`${API_BASE_URL}/api/profile/restaurant`, payload);
+      const res = await axios.put(`${API_URL}/api/profile/restaurant`, payload);
       const nextRestaurant = res.data?.restaurant;
       if (nextRestaurant) {
         onRestaurantUpdated?.(nextRestaurant);
@@ -215,7 +215,7 @@ export default function ProfileSettings({
 
     try {
       setCreatingUser(true);
-      const res = await axios.post(`${API_BASE_URL}/api/profile/users`, payload);
+      const res = await axios.post(`${API_URL}/api/profile/users`, payload);
       alert(res.data?.message || "User created");
       setNewUserForm(initialNewUserForm);
       await loadProfile();
@@ -232,7 +232,7 @@ export default function ProfileSettings({
 
     try {
       setUpdatingUserId(member.id);
-      const res = await axios.put(`${API_BASE_URL}/api/profile/users/${member.id}/access`, {
+      const res = await axios.put(`${API_URL}/api/profile/users/${member.id}/access`, {
         role: edits.role,
         isActive: edits.isActive,
         password: edits.password || undefined

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 
 const STATUS_OPTIONS = [
   { value: "AVAILABLE", label: "Available" },
@@ -27,7 +27,7 @@ export default function TableManagement() {
   const loadTables = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/tables`);
+      const res = await axios.get(`${API_URL}/api/tables`);
       setTables(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
@@ -63,7 +63,7 @@ export default function TableManagement() {
 
     try {
       setSaving(true);
-      await axios.post(`${API_BASE_URL}/api/tables`, {
+      await axios.post(`${API_URL}/api/tables`, {
         code: form.code.trim().toUpperCase(),
         displayName: form.displayName.trim(),
         capacity: Number(form.capacity || 2),
@@ -82,7 +82,7 @@ export default function TableManagement() {
 
   const updateTableStatus = async (tableId, status) => {
     try {
-      await axios.put(`${API_BASE_URL}/api/tables/${tableId}/status`, { status });
+      await axios.put(`${API_URL}/api/tables/${tableId}/status`, { status });
       await loadTables();
     } catch (err) {
       console.error(err);
@@ -96,7 +96,7 @@ export default function TableManagement() {
     }
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/tables/${tableId}`);
+      await axios.delete(`${API_URL}/api/tables/${tableId}`);
       await loadTables();
     } catch (err) {
       console.error(err);

@@ -42,7 +42,7 @@ import {
   getLandingPageForRole,
   normalizeBusinessType
 } from "./access";
-import { API_BASE_URL } from "./config";
+import API_URL from "./config/api";
 import { UI_CONFIG } from "./config/uiConfig";
 import { useAuthStore } from "./store/authStore";
 import { theme, cloudKitchenTheme } from "./theme";
@@ -463,7 +463,7 @@ function App() {
   const refreshAccessToken = useCallback(async () => {
     const tenantId = window.localStorage.getItem(ACTIVE_TENANT_STORAGE_KEY) || "";
     const res = await axios.post(
-      `${API_BASE_URL}/api/auth/refresh`,
+      `${API_URL}/api/auth/refresh`,
       {},
       {
         ...AUTH_REQUEST_CONFIG,
@@ -641,7 +641,7 @@ function App() {
 
   const fetchSessionProfile = useCallback(async () => {
     const tenantId = window.localStorage.getItem(ACTIVE_TENANT_STORAGE_KEY) || "";
-    const res = await axios.get(`${API_BASE_URL}/api/auth/me`, {
+    const res = await axios.get(`${API_URL}/api/auth/me`, {
       ...AUTH_REQUEST_CONFIG,
       headers: tenantId ? { "X-Tenant-Id": tenantId } : undefined
     });
@@ -651,7 +651,7 @@ function App() {
 
   const loadDatabaseStatus = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/ready`, {
+      const res = await axios.get(`${API_URL}/ready`, {
         skipAuthRefresh: true,
         validateStatus: () => true
       });
@@ -773,7 +773,7 @@ function App() {
   const handleLogout = useCallback(async () => {
     try {
       await axios.post(
-        `${API_BASE_URL}/api/auth/logout`,
+        `${API_URL}/api/auth/logout`,
         {},
         { ...AUTH_REQUEST_CONFIG, skipAuthRefresh: true }
       );
@@ -807,7 +807,7 @@ function App() {
       }
 
       try {
-        await axios.post(`${API_BASE_URL}/api/auth/select-tenant`, { tenantId }, AUTH_REQUEST_CONFIG);
+        await axios.post(`${API_URL}/api/auth/select-tenant`, { tenantId }, AUTH_REQUEST_CONFIG);
       } catch (err) {
         setAuthError(err.response?.data?.message || "Unable to switch workspace");
         return;

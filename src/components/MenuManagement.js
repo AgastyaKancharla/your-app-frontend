@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 import { cloudKitchenTheme } from "../theme";
 import { DEFAULT_MENU_IMAGE, formatCurrency } from "./cloud/cloudKitchenUtils";
 
@@ -340,7 +340,7 @@ export default function MenuManagement() {
   const loadMenuItems = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/api/menu`);
+      const response = await axios.get(`${API_URL}/api/menu`);
       const nextItems = Array.isArray(response.data)
         ? response.data.map(normalizeMenuItem)
         : [];
@@ -501,10 +501,10 @@ export default function MenuManagement() {
       setMessage("");
 
       if (editingItem && !editingItem.__isDemo && editingItem._id) {
-        await axios.put(`${API_BASE_URL}/api/menu/${editingItem._id}`, payload);
+        await axios.put(`${API_URL}/api/menu/${editingItem._id}`, payload);
         setMessage("Menu item updated.");
       } else {
-        await axios.post(`${API_BASE_URL}/api/menu`, payload);
+        await axios.post(`${API_URL}/api/menu`, payload);
         setMessage(editingItem?.__isDemo ? "Sample item saved as a live menu item." : "Menu item created.");
       }
 
@@ -529,7 +529,7 @@ export default function MenuManagement() {
     }
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/menu/${item._id}`);
+      await axios.delete(`${API_URL}/api/menu/${item._id}`);
       setMenuItems((current) => current.filter((entry) => entry._id !== item._id));
       setMessage("Menu item deleted.");
       setError("");
@@ -548,7 +548,7 @@ export default function MenuManagement() {
       setUploadingImage(true);
       const formData = new FormData();
       formData.append("image", file);
-      const response = await axios.post(`${API_BASE_URL}/api/menu/upload-image`, formData, {
+      const response = await axios.post(`${API_URL}/api/menu/upload-image`, formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }
@@ -609,7 +609,7 @@ export default function MenuManagement() {
       }
 
       const results = await Promise.allSettled(
-        payloads.map((payload) => axios.post(`${API_BASE_URL}/api/menu`, payload))
+        payloads.map((payload) => axios.post(`${API_URL}/api/menu`, payload))
       );
       const successCount = results.filter((result) => result.status === "fulfilled").length;
       const failureCount = results.length - successCount;

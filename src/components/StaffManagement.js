@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
 import { STAFF_ROLE_OPTIONS, formatRoleLabel } from "../access";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 
 const ATTENDANCE_OPTIONS = [
   { value: "PRESENT", label: "Present" },
@@ -78,7 +78,7 @@ export default function StaffManagement() {
   const loadStaff = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/staff`);
+      const res = await axios.get(`${API_URL}/api/staff`);
       const nextStaff = Array.isArray(res.data) ? res.data : [];
       setStaff(nextStaff);
       setDrafts(
@@ -122,7 +122,7 @@ export default function StaffManagement() {
 
     try {
       setSaving(true);
-      await axios.post(`${API_BASE_URL}/api/staff`, {
+      await axios.post(`${API_URL}/api/staff`, {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
@@ -152,7 +152,7 @@ export default function StaffManagement() {
 
     try {
       setUpdatingId(member.id);
-      await axios.put(`${API_BASE_URL}/api/staff/${member.id}`, {
+      await axios.put(`${API_URL}/api/staff/${member.id}`, {
         name: draft.name.trim(),
         phone: draft.phone.trim(),
         role: draft.role,

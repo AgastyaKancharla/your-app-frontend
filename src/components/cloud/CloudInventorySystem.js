@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 
-import { API_BASE_URL } from "../../config";
+import API_URL from "../../config/api";
 import { useInventoryStore } from "../../store/inventoryStore";
 import { cloudKitchenTheme } from "../../theme";
 import { connectOrdersSocket, formatCurrency } from "./cloudKitchenUtils";
@@ -258,10 +258,10 @@ export default function InventorySystem() {
   const loadSupportingData = useCallback(async () => {
     try {
       const [suppliersRes, rawRes, prepRes, packagingRes] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/api/inventory/suppliers`, { params: { limit: 100 } }),
-        axios.get(`${API_BASE_URL}/api/inventory/raw`, { params: { limit: 100 } }),
-        axios.get(`${API_BASE_URL}/api/inventory/prep`, { params: { limit: 100 } }),
-        axios.get(`${API_BASE_URL}/api/inventory/packaging`, { params: { limit: 100 } })
+        axios.get(`${API_URL}/api/inventory/suppliers`, { params: { limit: 100 } }),
+        axios.get(`${API_URL}/api/inventory/raw`, { params: { limit: 100 } }),
+        axios.get(`${API_URL}/api/inventory/prep`, { params: { limit: 100 } }),
+        axios.get(`${API_URL}/api/inventory/packaging`, { params: { limit: 100 } })
       ]);
 
       setSupporting({
@@ -291,7 +291,7 @@ export default function InventorySystem() {
         delete params.status;
       }
 
-      const response = await axios.get(`${API_BASE_URL}${activeConfig.endpoint}`, { params });
+      const response = await axios.get(`${API_URL}${activeConfig.endpoint}`, { params });
       setRows(Array.isArray(response.data?.data) ? response.data.data : []);
       setMetrics(response.data?.metrics || {});
       setError("");
@@ -385,8 +385,8 @@ export default function InventorySystem() {
       const id = editingRow ? getRowId(editingRow) : "";
       const method = editingRow ? "put" : "post";
       const url = editingRow
-        ? `${API_BASE_URL}${activeConfig.endpoint}/${id}`
-        : `${API_BASE_URL}${activeConfig.endpoint}`;
+        ? `${API_URL}${activeConfig.endpoint}/${id}`
+        : `${API_URL}${activeConfig.endpoint}`;
 
       await axios[method](url, payload);
       setMessage(editingRow ? "Updated successfully." : "Created successfully.");
@@ -406,7 +406,7 @@ export default function InventorySystem() {
     }
 
     try {
-      await axios.delete(`${API_BASE_URL}${activeConfig.endpoint}/${getRowId(row)}`);
+      await axios.delete(`${API_URL}${activeConfig.endpoint}/${getRowId(row)}`);
       setMessage("Deleted successfully.");
       await loadActiveTab();
       await loadSupportingData();
@@ -417,7 +417,7 @@ export default function InventorySystem() {
 
   const updatePOStatus = async (row, status) => {
     try {
-      await axios.patch(`${API_BASE_URL}/api/inventory/purchase-orders/${getRowId(row)}/status`, {
+      await axios.patch(`${API_URL}/api/inventory/purchase-orders/${getRowId(row)}/status`, {
         status
       });
       setMessage(status === "DELIVERED" ? "PO received and stock updated." : "PO status updated.");
@@ -431,7 +431,7 @@ export default function InventorySystem() {
   const saveInlineRaw = async (row, patch) => {
     try {
       const payload = buildPayload("raw", { ...buildFormFromRow("raw", row), ...patch });
-      await axios.put(`${API_BASE_URL}/api/inventory/raw/${getRowId(row)}`, payload);
+      await axios.put(`${API_URL}/api/inventory/raw/${getRowId(row)}`, payload);
       await loadActiveTab();
       await loadSupportingData();
     } catch (requestError) {
@@ -473,7 +473,7 @@ export default function InventorySystem() {
 
       for (const record of records) {
         const payload = buildPayload(activeTab, normalizeImportRecord(activeTab, record));
-        await axios.post(`${API_BASE_URL}${activeConfig.endpoint}`, payload);
+        await axios.post(`${API_URL}${activeConfig.endpoint}`, payload);
       }
 
       setMessage(`Imported ${records.length} ${records.length === 1 ? "row" : "rows"}.`);

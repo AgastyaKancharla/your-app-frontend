@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { io } from "socket.io-client";
 
 import { normalizeOrderStatus } from "../../access";
-import { API_BASE_URL } from "../../config";
+import API_URL from "../../config/api";
 import { useAuthStore } from "../../store/authStore";
 import { useOrderStore } from "../../store/orderStore";
 import { cloudKitchenTheme } from "../../theme";
@@ -22,8 +22,7 @@ import WastagePanel from "../command-center/WastagePanel";
 import DashboardSkeleton from "./DashboardSkeleton";
 import ToastStack from "./ToastStack";
 
-const socketOrigin =
-  API_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+const socketOrigin = API_URL;
 
 const ACTIVE_ORDER_STATUSES = new Set(["NEW", "PREPARING", "READY"]);
 const DEFAULT_DELAY_THRESHOLD_MINUTES = 15;
@@ -351,12 +350,12 @@ export default function CloudDashboardHome({
       try {
         const params = buildRangeParams(dateRange);
         const results = await Promise.allSettled([
-          axios.get(`${API_BASE_URL}/api/dashboard/metrics`, { params }),
-          axios.get(`${API_BASE_URL}/api/reports/sales`, { params }),
-          axios.get(`${API_BASE_URL}/api/reports/wastage`, { params }),
-          axios.get(`${API_BASE_URL}/api/orders/active`),
-          axios.get(`${API_BASE_URL}/api/inventory/overview`),
-          axios.get(`${API_BASE_URL}/api/insights`)
+          axios.get(`${API_URL}/api/dashboard/metrics`, { params }),
+          axios.get(`${API_URL}/api/reports/sales`, { params }),
+          axios.get(`${API_URL}/api/reports/wastage`, { params }),
+          axios.get(`${API_URL}/api/orders/active`),
+          axios.get(`${API_URL}/api/inventory/overview`),
+          axios.get(`${API_URL}/api/insights`)
         ]);
 
         if (loadRequestRef.current !== requestId) {
@@ -631,7 +630,7 @@ export default function CloudDashboardHome({
           return sortOrders(nextOrders);
         });
 
-        await axios.put(`${API_BASE_URL}/api/orders/${order._id}/status`, { status: nextStatus });
+        await axios.put(`${API_URL}/api/orders/${order._id}/status`, { status: nextStatus });
         pushToast(getToastMessageForStatus(nextStatus));
         scheduleBackgroundRefresh();
       } catch (err) {
@@ -653,7 +652,7 @@ export default function CloudDashboardHome({
     try {
       setMenuLoading(true);
       if (!menuItems.length) {
-        const response = await axios.get(`${API_BASE_URL}/api/menu`);
+        const response = await axios.get(`${API_URL}/api/menu`);
         const nextItems = Array.isArray(response.data) ? response.data : [];
         setMenuItems(nextItems);
         const firstAvailable = nextItems.find((item) => item.isAvailable !== false);
@@ -676,7 +675,7 @@ export default function CloudDashboardHome({
 
     try {
       setPausingItem(true);
-      await axios.put(`${API_BASE_URL}/api/menu/${selectedItem._id}`, {
+      await axios.put(`${API_URL}/api/menu/${selectedItem._id}`, {
         ...selectedItem,
         isAvailable: false
       });

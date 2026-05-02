@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 
 const EXPENSE_CATEGORIES = [
   "Rent",
@@ -63,7 +63,7 @@ export default function ExpenseManagement() {
         params.to = filters.to;
       }
 
-      const res = await axios.get(`${API_BASE_URL}/api/expenses`, { params });
+      const res = await axios.get(`${API_URL}/api/expenses`, { params });
       const payload = res.data || {};
 
       setExpenses(Array.isArray(payload.expenses) ? payload.expenses : []);
@@ -103,7 +103,7 @@ export default function ExpenseManagement() {
 
     try {
       setSaving(true);
-      await axios.post(`${API_BASE_URL}/api/expenses`, {
+      await axios.post(`${API_URL}/api/expenses`, {
         category: form.category.trim(),
         amount,
         description: form.description.trim()

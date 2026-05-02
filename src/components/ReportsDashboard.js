@@ -8,7 +8,7 @@ import {
   isCompletedOrderStatus,
   getOrderStatusTone
 } from "../access";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 import { useOrderStore } from "../store/orderStore";
 
 const INR_FORMATTER = new Intl.NumberFormat("en-IN", {
@@ -232,11 +232,11 @@ export function OrderAnalyticsV2() {
         }
 
         const [dashboardRes, ordersRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/reports/dashboard`, {
+          axios.get(`${API_URL}/api/reports/dashboard`, {
             params,
             signal: controller.signal
           }),
-          axios.get(`${API_BASE_URL}/api/orders`, {
+          axios.get(`${API_URL}/api/orders`, {
             signal: controller.signal
           })
         ]);

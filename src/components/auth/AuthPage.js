@@ -5,7 +5,7 @@ import {
   COMPANY_PROBLEM_STATEMENT,
   COMPANY_TAGLINE
 } from "../../branding";
-import { API_BASE_URL } from "../../config";
+import API_URL from "../../config/api";
 
 const ENABLE_SUPER_ADMIN_LOGIN =
   String(process.env.REACT_APP_ENABLE_SUPER_ADMIN_LOGIN || "false").toLowerCase() ===
@@ -447,7 +447,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/login`,
+        `${API_URL}/api/auth/login`,
         JSON.stringify({
           email,
           password
@@ -486,7 +486,7 @@ export default function AuthPage({
 
       if (!err.response) {
         showError(
-          `Cannot reach auth server at ${API_BASE_URL || "configured API URL"}. Start backend on localhost:5000 or set REACT_APP_API_URL correctly.`
+          `Cannot reach auth server at ${API_URL}. Set REACT_APP_API_URL correctly.`
         );
         return;
       }
@@ -511,7 +511,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/verify-login-otp`,
+        `${API_URL}/api/auth/verify-login-otp`,
         {
           email,
           code,
@@ -551,7 +551,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/verify-email`,
+        `${API_URL}/api/auth/verify-email`,
         {
           email,
           code
@@ -590,7 +590,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/login`,
+        `${API_URL}/api/auth/login`,
         {
           email,
           password
@@ -651,7 +651,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/signup`,
+        `${API_URL}/api/auth/signup`,
         JSON.stringify({
           restaurantName,
           businessType,
@@ -703,7 +703,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/forgot-password/request`,
+        `${API_URL}/api/auth/forgot-password/request`,
         {
           identifier
         },
@@ -753,7 +753,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/forgot-password/verify`,
+        `${API_URL}/api/auth/forgot-password/verify`,
         {
           identifier,
           code,
@@ -794,7 +794,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/forgot-username/request`,
+        `${API_URL}/api/auth/forgot-username/request`,
         {
           identifier
         },
@@ -832,7 +832,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/forgot-username/verify`,
+        `${API_URL}/api/auth/forgot-username/verify`,
         {
           identifier,
           code,
@@ -874,7 +874,7 @@ export default function AuthPage({
 
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/api/auth/super-admin/login`,
+        `${API_URL}/api/auth/super-admin/login`,
         {
           email,
           password

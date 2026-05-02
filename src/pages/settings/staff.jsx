@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-import { API_BASE_URL } from "../../config";
+import API_URL from "../../config/api";
 import { useActivityStore } from "../../store/activityStore";
 import { useAuthStore } from "../../store/authStore";
 
@@ -43,7 +43,7 @@ export default function StaffSettingsPage() {
     setMessage("");
 
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/staff`);
+      const response = await axios.get(`${API_URL}/api/staff`);
       setStaff(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       setMessage(err.response?.data?.message || "Unable to load staff.");
@@ -87,7 +87,7 @@ export default function StaffSettingsPage() {
         password: form.password,
         role: toApiRole(form.role)
       };
-      const response = await axios.post(`${API_BASE_URL}/api/staff`, payload);
+      const response = await axios.post(`${API_URL}/api/staff`, payload);
       const created = response.data;
       setStaff((current) => [created, ...current]);
       setForm(defaultForm);
@@ -109,7 +109,7 @@ export default function StaffSettingsPage() {
     setMessage("");
 
     try {
-      const response = await axios.put(`${API_BASE_URL}/api/staff/${member.id}`, updates);
+      const response = await axios.put(`${API_URL}/api/staff/${member.id}`, updates);
       const updated = response.data;
       setStaff((current) =>
         current.map((item) => (item.id === updated.id ? updated : item))

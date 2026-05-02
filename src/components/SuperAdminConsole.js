@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 
 const PLAN_OPTIONS = ["FREE", "BASIC", "PRO", "ENTERPRISE"];
 const STATUS_OPTIONS = ["ALL", "ACTIVE", "SUSPENDED"];
@@ -50,7 +50,7 @@ export default function SuperAdminConsole() {
   const fetchOverview = useCallback(async () => {
     try {
       setLoadingOverview(true);
-      const res = await axios.get(`${API_BASE_URL}/api/admin/overview`);
+      const res = await axios.get(`${API_URL}/api/admin/overview`);
       setOverview(res.data || null);
     } catch (err) {
       console.error(err);
@@ -72,7 +72,7 @@ export default function SuperAdminConsole() {
       if (statusFilter !== "ALL") params.status = statusFilter;
       if (planFilter !== "ALL") params.plan = planFilter;
 
-      const res = await axios.get(`${API_BASE_URL}/api/admin/tenants`, { params });
+      const res = await axios.get(`${API_URL}/api/admin/tenants`, { params });
       const payload = res.data || {};
       setTenants(Array.isArray(payload.items) ? payload.items : []);
       setPagination(payload.pagination || { total: 0, totalPages: 1 });
@@ -92,7 +92,7 @@ export default function SuperAdminConsole() {
 
     try {
       setLoadingTenantDetails(true);
-      const res = await axios.get(`${API_BASE_URL}/api/admin/tenants/${tenantId}`);
+      const res = await axios.get(`${API_URL}/api/admin/tenants/${tenantId}`);
       const payload = res.data || null;
       setSelectedTenant(payload);
       setSelectedTenantPlan(payload?.restaurant?.subscriptionPlan || "FREE");
@@ -125,7 +125,7 @@ export default function SuperAdminConsole() {
   const setTenantStatus = async (tenantId, status) => {
     try {
       setSavingAction(true);
-      await axios.patch(`${API_BASE_URL}/api/admin/tenants/${tenantId}/status`, {
+      await axios.patch(`${API_URL}/api/admin/tenants/${tenantId}/status`, {
         status
       });
       await refreshAll();
@@ -143,7 +143,7 @@ export default function SuperAdminConsole() {
 
     try {
       setSavingAction(true);
-      await axios.patch(`${API_BASE_URL}/api/admin/tenants/${tenantId}/plan`, {
+      await axios.patch(`${API_URL}/api/admin/tenants/${tenantId}/plan`, {
         plan: selectedTenantPlan,
         defaultDays: selectedTenantPlan === "FREE" ? 0 : Number(selectedTenantDays || 30)
       });
@@ -164,7 +164,7 @@ export default function SuperAdminConsole() {
 
     try {
       setSavingAction(true);
-      await axios.post(`${API_BASE_URL}/api/admin/tenants/${tenantId}/force-signout`);
+      await axios.post(`${API_URL}/api/admin/tenants/${tenantId}/force-signout`);
       await refreshAll();
       alert("Forced signout completed");
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 
 const readableSize = (size) => {
   const value = Number(size || 0);
@@ -36,7 +36,7 @@ export default function DocumentsVault() {
   const loadDocuments = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/documents`);
+      const res = await axios.get(`${API_URL}/api/documents`);
       setDocuments(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
@@ -62,7 +62,7 @@ export default function DocumentsVault() {
 
     try {
       setUploading(true);
-      await axios.post(`${API_BASE_URL}/api/documents`, formData, {
+      await axios.post(`${API_URL}/api/documents`, formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }
@@ -82,7 +82,7 @@ export default function DocumentsVault() {
 
   const handleDownload = async (doc) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/documents/${doc._id}/download`, {
+      const res = await axios.get(`${API_URL}/api/documents/${doc._id}/download`, {
         responseType: "blob"
       });
 
@@ -107,7 +107,7 @@ export default function DocumentsVault() {
     }
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/documents/${doc._id}`);
+      await axios.delete(`${API_URL}/api/documents/${doc._id}`);
       await loadDocuments();
     } catch (err) {
       console.error(err);

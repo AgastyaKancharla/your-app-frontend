@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 
 const createCampaignForm = () => ({
   channel: "WHATSAPP",
@@ -57,7 +57,7 @@ export default function MarketingTools() {
   const loadOverview = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/marketing/overview`);
+      const res = await axios.get(`${API_URL}/api/marketing/overview`);
       setOverview(res.data || {});
     } catch (err) {
       console.error(err);
@@ -128,7 +128,7 @@ export default function MarketingTools() {
 
     try {
       setSavingCampaign(true);
-      await axios.post(`${API_BASE_URL}/api/marketing/campaigns`, {
+      await axios.post(`${API_URL}/api/marketing/campaigns`, {
         channel: campaignForm.channel,
         title: campaignForm.title.trim(),
         message: campaignForm.message.trim(),
@@ -152,7 +152,7 @@ export default function MarketingTools() {
 
     try {
       setSavingCoupon(true);
-      await axios.post(`${API_BASE_URL}/api/marketing/coupons`, {
+      await axios.post(`${API_URL}/api/marketing/coupons`, {
         code: couponForm.code.trim().toUpperCase(),
         title: couponForm.title.trim(),
         discountType: couponForm.discountType,
@@ -178,7 +178,7 @@ export default function MarketingTools() {
 
     try {
       setSavingAutomation(true);
-      await axios.post(`${API_BASE_URL}/api/marketing/automations`, {
+      await axios.post(`${API_URL}/api/marketing/automations`, {
         name: automationForm.name.trim(),
         triggerType: automationForm.triggerType,
         channel: automationForm.channel,
@@ -197,7 +197,7 @@ export default function MarketingTools() {
 
   const toggleAutomation = async (automationId, isActive) => {
     try {
-      await axios.put(`${API_BASE_URL}/api/marketing/automations/${automationId}/toggle`, {
+      await axios.put(`${API_URL}/api/marketing/automations/${automationId}/toggle`, {
         isActive
       });
       await loadOverview();

@@ -11,7 +11,7 @@ import {
   YAxis
 } from "recharts";
 
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 import { cloudKitchenTheme } from "../theme";
 
 const RANGE_OPTIONS = [
@@ -341,7 +341,7 @@ export default function OrderManagementDashboard() {
         params.to = filters.to;
       }
 
-      const response = await axios.get(`${API_BASE_URL}/api/orders/analytics-summary`, {
+      const response = await axios.get(`${API_URL}/api/orders/analytics-summary`, {
         params,
         signal
       });
@@ -386,9 +386,9 @@ export default function OrderManagementDashboard() {
       setUpdatingOrderId(order.id);
       setError("");
       if (nextStatus === "CANCELLED") {
-        await axios.put(`${API_BASE_URL}/api/orders/${order.id}/cancel`);
+        await axios.put(`${API_URL}/api/orders/${order.id}/cancel`);
       } else {
-        await axios.patch(`${API_BASE_URL}/api/orders/${order.id}/status`, { status: nextStatus });
+        await axios.patch(`${API_URL}/api/orders/${order.id}/status`, { status: nextStatus });
       }
       await loadSummary();
     } catch (requestError) {
@@ -406,7 +406,7 @@ export default function OrderManagementDashboard() {
     try {
       setUpdatingOrderId(order.id);
       setError("");
-      await axios.put(`${API_BASE_URL}/api/orders/${order.id}/cancel`);
+      await axios.put(`${API_URL}/api/orders/${order.id}/cancel`);
       await loadSummary();
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Unable to cancel order.");

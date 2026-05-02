@@ -1,8 +1,8 @@
 import axios from "axios";
 
-import { API_BASE_URL } from "../../config";
+import API_URL from "../../config/api";
 
-const crmBaseUrl = `${API_BASE_URL}/api/crm`;
+const crmBaseUrl = `${API_URL}/api/crm`;
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",

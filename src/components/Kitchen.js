@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 import { useActivityStore } from "../store/activityStore";
 import { useAuthStore } from "../store/authStore";
 import { useOrderStore } from "../store/orderStore";
@@ -221,7 +221,7 @@ export default function Kitchen() {
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/api/orders`, {
+      const response = await axios.get(`${API_URL}/api/orders`, {
         params: {
           businessType: "CLOUD_KITCHEN"
         }
@@ -386,7 +386,7 @@ export default function Kitchen() {
     try {
       setUpdatingOrderId(order._id);
       setError("");
-      const response = await axios.patch(`${API_BASE_URL}/api/orders/${order._id}/status`, {
+      const response = await axios.patch(`${API_URL}/api/orders/${order._id}/status`, {
         status: normalizedNextStatus
       });
       const updatedOrder = normalizeOrder(response.data || order);
@@ -424,7 +424,7 @@ export default function Kitchen() {
         return;
       }
 
-      await axios.put(`${API_BASE_URL}/api/orders/${order._id}/cancel`);
+      await axios.put(`${API_URL}/api/orders/${order._id}/cancel`);
       setOrders(orders.filter((item) => normalizeOrder(item)._id !== order._id));
       addLog({
         userId: user?.id || user?._id || "",

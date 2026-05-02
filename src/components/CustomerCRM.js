@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 
 const CURRENCY = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -159,7 +159,7 @@ export default function CustomerCRM() {
   const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/customers`);
+      const res = await axios.get(`${API_URL}/api/customers`);
       const nextCustomers = Array.isArray(res.data) ? res.data : [];
       setCustomers(nextCustomers);
       setSelectedCustomerId((currentSelected) => currentSelected || nextCustomers[0]?.id || "");
@@ -364,7 +364,7 @@ export default function CustomerCRM() {
         text: "Searching customer profile..."
       });
 
-      const response = await axios.get(`${API_BASE_URL}/api/customers/lookup`, {
+      const response = await axios.get(`${API_URL}/api/customers/lookup`, {
         params: { phone: normalized }
       });
 
@@ -402,7 +402,7 @@ export default function CustomerCRM() {
 
     setIsResolvingAddress(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/customers/reverse-geocode`, {
+      const response = await axios.get(`${API_URL}/api/customers/reverse-geocode`, {
         params: {
           latitude: lat,
           longitude: lng
@@ -443,7 +443,7 @@ export default function CustomerCRM() {
 
     setIsResolvingAddress(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/customers/geocode`, {
+      const response = await axios.get(`${API_URL}/api/customers/geocode`, {
         params: {
           query
         }
@@ -533,7 +533,7 @@ export default function CustomerCRM() {
 
     try {
       setSaving(true);
-      await axios.put(`${API_BASE_URL}/api/customers/${selectedCustomer.id}`, {
+      await axios.put(`${API_URL}/api/customers/${selectedCustomer.id}`, {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         address: form.address.trim(),

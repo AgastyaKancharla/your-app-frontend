@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 import PermissionGuard from "./PermissionGuard";
 import { useActivityStore } from "../store/activityStore";
 import { useAuthStore } from "../store/authStore";
@@ -264,7 +264,7 @@ export default function POS() {
   const loadMenu = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/api/menu`);
+      const response = await axios.get(`${API_URL}/api/menu`);
       const nextItems = Array.isArray(response.data)
         ? response.data.map(normalizeMenuItem)
         : [];
@@ -544,7 +544,7 @@ export default function POS() {
     try {
       setPlacingOrder(true);
       setError("");
-      const response = await axios.post(`${API_BASE_URL}/api/orders`, orderPayload);
+      const response = await axios.post(`${API_URL}/api/orders`, orderPayload);
       const savedOrder = response.data || order;
       addOrder(savedOrder);
       cart.forEach((line) => {

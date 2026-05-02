@@ -8,7 +8,7 @@ import {
   formatOrderStatus,
   normalizeOrderStatus
 } from "../../access";
-import { API_BASE_URL } from "../../config";
+import API_URL from "../../config/api";
 
 const INR_FORMATTER = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -130,7 +130,7 @@ export default function Home({ user, onNavigate }) {
           params.days = rangeFilter.days;
         }
 
-        const dashboardRes = await axios.get(`${API_BASE_URL}/api/reports/dashboard`, {
+        const dashboardRes = await axios.get(`${API_URL}/api/reports/dashboard`, {
           params,
           signal: controller.signal
         });

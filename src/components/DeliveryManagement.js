@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import PageContainer from "./ui/PageContainer";
 import { formatOrderStatus, normalizeOrderStatus } from "../access";
-import { API_BASE_URL } from "../config";
+import API_URL from "../config/api";
 import { useOrderStore } from "../store/orderStore";
 
 const CURRENCY = new Intl.NumberFormat("en-IN", {
@@ -27,7 +27,7 @@ export default function DeliveryManagement() {
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/api/delivery`);
+      const res = await axios.get(`${API_URL}/api/delivery`);
       const nextOrders = Array.isArray(res.data) ? res.data : [];
       setOrders(nextOrders);
       setDrafts((prev) =>
@@ -100,7 +100,7 @@ export default function DeliveryManagement() {
 
     try {
       setSavingOrderId(order._id);
-      await axios.put(`${API_BASE_URL}/api/delivery/${order._id}/assign`, {
+      await axios.put(`${API_URL}/api/delivery/${order._id}/assign`, {
         partnerName: draft.partnerName,
         partnerPhone: draft.partnerPhone,
         etaMinutes: Number(draft.etaMinutes || 0),
@@ -118,7 +118,7 @@ export default function DeliveryManagement() {
   const markDelivered = async (orderId) => {
     try {
       setSavingOrderId(orderId);
-      await axios.put(`${API_BASE_URL}/api/delivery/${orderId}/complete`);
+      await axios.put(`${API_URL}/api/delivery/${orderId}/complete`);
       updateOrderStatus(orderId, "completed");
       await loadOrders();
     } catch (err) {
