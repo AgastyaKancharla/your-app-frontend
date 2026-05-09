@@ -12,6 +12,13 @@ const TABS = [
   { key: "raw", label: "Raw Materials", endpoint: "/api/inventory/raw" },
   { key: "prep", label: "Prep Items", endpoint: "/api/inventory/prep" },
   { key: "packaging", label: "Packaging", endpoint: "/api/inventory/packaging" },
+  { key: "recipes", label: "Recipes", endpoint: "/api/recipes/versions" },
+  { key: "movements", label: "Movements", endpoint: "/api/inventory/movements" },
+  { key: "reconciliation", label: "Reconciliation", endpoint: "/api/inventory/reconciliations" },
+  { key: "alerts", label: "Alerts", endpoint: "/api/alerts/inventory" },
+  { key: "suggestions", label: "Purchase Suggestions", endpoint: "/api/inventory/purchase-suggestions" },
+  { key: "intelligence", label: "Cost Intelligence", endpoint: "/api/inventory/analytics/stock" },
+  { key: "ops", label: "Ops Dashboard", endpoint: "/api/inventory/analytics/stock" },
   { key: "wastage", label: "Wastage", endpoint: "/api/inventory/wastage" },
   { key: "suppliers", label: "Suppliers", endpoint: "/api/inventory/suppliers" },
   { key: "purchase-orders", label: "Purchase Orders", endpoint: "/api/inventory/purchase-orders" }
@@ -76,6 +83,20 @@ const EMPTY_FORMS = {
     expectedDelivery: "",
     notes: "",
     items: [{ type: "raw", itemId: "", itemName: "", qty: "", unit: "kg", cost: "" }]
+  },
+  recipes: {
+    menuItemId: "",
+    menuItem: "",
+    variantId: "",
+    variantName: "",
+    yieldQuantity: "1",
+    preparationLossPercent: "0",
+    ingredients: [{ ingredientId: "", ingredientType: "raw_material", quantity: "", unit: "kg", isCritical: true }]
+  },
+  reconciliation: {
+    date: new Date().toISOString().slice(0, 10),
+    notes: "",
+    items: []
   }
 };
 
@@ -177,7 +198,14 @@ const METRIC_CONFIG = {
     ["inTransit", "In Transit"],
     ["received", "Received"],
     ["monthlyValue", "Monthly Value", "currency"]
-  ]
+  ],
+  movements: [["total", "Ledger Rows"], ["purchases", "Purchases"], ["deductions", "Deductions"], ["adjustments", "Adjustments"]],
+  recipes: [["totalRecipes", "Recipes"], ["activeVersions", "Active Versions"], ["mappedVariants", "Mapped Variants"], ["avgCost", "Avg Recipe Cost", "currency"]],
+  reconciliation: [["pending", "Pending Counts"], ["approved", "Approved"], ["variance", "Variance Items"], ["varianceCost", "Variance Cost", "currency"]],
+  alerts: [["open", "Open Alerts"], ["critical", "Critical"], ["warnings", "Warnings"], ["acknowledged", "Acknowledged"]],
+  suggestions: [["recommendations", "Recommendations"], ["estimatedValue", "Estimated Value", "currency"], ["suppliers", "Suppliers"], ["urgent", "Urgent"]],
+  intelligence: [["stockValue", "Stock Value", "currency"], ["lowStock", "Low Stock"], ["negativeStock", "Negative Stock"], ["rawMaterials", "Raw Materials"]],
+  ops: [["lowStock", "Low Stock"], ["todayWastage", "Today Wastage", "currency"], ["overrideCount", "Overrides"], ["expiringItems", "Expiring Items"]]
 };
 
 const STATUS_FILTERS = {
@@ -187,6 +215,14 @@ const STATUS_FILTERS = {
   wastage: ["ALL", "raw", "prep", "packaging"],
   suppliers: ["ALL", "ACTIVE", "INACTIVE"],
   "purchase-orders": ["ALL", "OPEN", "CONFIRMED", "IN_TRANSIT", "DELIVERED"]
+  ,
+  movements: ["ALL", "purchase", "order_deduction", "wastage", "adjustment", "prep_consumption", "prep_production", "reconciliation_adjustment"],
+  reconciliation: ["ALL", "pending", "approved", "rejected"],
+  alerts: ["ALL", "low_stock", "critical_low_stock", "negative_stock", "abnormal_variance", "excessive_wastage", "expiring_soon", "excessive_overrides"],
+  recipes: ["ALL", "ACTIVE", "VERSIONED"],
+  suggestions: ["ALL"],
+  intelligence: ["ALL"],
+  ops: ["ALL"]
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -246,6 +282,14 @@ export default function InventorySystem() {
   const [editingRow, setEditingRow] = useState(null);
   const [viewingRow, setViewingRow] = useState(null);
   const [form, setForm] = useState(EMPTY_FORMS.raw);
+  const [hybridRows, setHybridRows] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
+  const [movementFilters, setMovementFilters] = useState({
+    movementType: "ALL",
+    itemType: "ALL",
+    from: "",
+    to: ""
+  });
   const [supporting, setSupporting] = useState({
     suppliers: [],
     raw: [],
@@ -257,11 +301,12 @@ export default function InventorySystem() {
 
   const loadSupportingData = useCallback(async () => {
     try {
-      const [suppliersRes, rawRes, prepRes, packagingRes] = await Promise.allSettled([
+      const [suppliersRes, rawRes, prepRes, packagingRes, menuRes] = await Promise.allSettled([
         axios.get(`${API_URL}/api/inventory/suppliers`, { params: { limit: 100 } }),
         axios.get(`${API_URL}/api/inventory/raw`, { params: { limit: 100 } }),
         axios.get(`${API_URL}/api/inventory/prep`, { params: { limit: 100 } }),
-        axios.get(`${API_URL}/api/inventory/packaging`, { params: { limit: 100 } })
+        axios.get(`${API_URL}/api/inventory/packaging`, { params: { limit: 100 } }),
+        axios.get(`${API_URL}/api/menu`)
       ]);
 
       setSupporting({
@@ -272,8 +317,10 @@ export default function InventorySystem() {
         packaging:
           packagingRes.status === "fulfilled" ? packagingRes.value.data?.data || [] : []
       });
+      setMenuItems(menuRes.status === "fulfilled" && Array.isArray(menuRes.value.data) ? menuRes.value.data : []);
     } catch {
       setSupporting({ suppliers: [], raw: [], prep: [], packaging: [] });
+      setMenuItems([]);
     }
   }, []);
 
@@ -291,18 +338,28 @@ export default function InventorySystem() {
         delete params.status;
       }
 
+      if (activeTab === "movements") {
+        if (movementFilters.movementType !== "ALL") params.movementType = movementFilters.movementType;
+        if (movementFilters.itemType !== "ALL") params.itemType = movementFilters.itemType;
+        if (movementFilters.from) params.from = movementFilters.from;
+        if (movementFilters.to) params.to = movementFilters.to;
+      }
+
       const response = await axios.get(`${API_URL}${activeConfig.endpoint}`, { params });
-      setRows(Array.isArray(response.data?.data) ? response.data.data : []);
-      setMetrics(response.data?.metrics || {});
+      const nextRows = normalizeTabRows(activeTab, response.data);
+      setHybridRows(nextRows);
+      setRows(["raw", "prep", "packaging", "wastage", "suppliers", "purchase-orders"].includes(activeTab) ? nextRows : []);
+      setMetrics(buildTabMetrics(activeTab, response.data, nextRows));
       setError("");
     } catch (requestError) {
       setRows([]);
+      setHybridRows([]);
       setMetrics({});
       setError(requestError.response?.data?.message || "Unable to load inventory data.");
     } finally {
       setLoading(false);
     }
-  }, [activeConfig.endpoint, activeTab, search, setRows, statusFilter]);
+  }, [activeConfig.endpoint, activeTab, movementFilters, search, setRows, statusFilter]);
 
   useEffect(() => {
     setStatusFilter("ALL");
@@ -359,9 +416,57 @@ export default function InventorySystem() {
   }, []);
 
   const openCreate = () => {
+    if (!EMPTY_FORMS[activeTab]) {
+      return;
+    }
     setEditingRow(null);
     setForm(JSON.parse(JSON.stringify(EMPTY_FORMS[activeTab])));
     setModalMode("edit");
+  };
+
+  const createRecommendationPO = async (recommendation) => {
+    try {
+      const supplierId = recommendation.supplierId || "";
+      await axios.post(`${API_URL}/api/inventory/purchase-orders`, {
+        supplierId,
+        status: "OPEN",
+        items: [
+          {
+            type: recommendation.itemType === "packaging" ? "packaging" : "raw",
+            itemId: recommendation.itemId,
+            itemName: recommendation.itemName,
+            qty: recommendation.recommendedQuantity,
+            unit: recommendation.unit,
+            cost: recommendation.costPerUnit || 0
+          }
+        ]
+      });
+      setMessage("Purchase order drafted from recommendation.");
+      await loadActiveTab();
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Unable to create purchase order.");
+    }
+  };
+
+  const acknowledgeAlert = async (row) => {
+    try {
+      await axios.patch(`${API_URL}/api/alerts/inventory/${getRowId(row)}/acknowledge`);
+      setMessage("Alert acknowledged.");
+      await loadActiveTab();
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Unable to acknowledge alert.");
+    }
+  };
+
+  const approveReconciliation = async (row) => {
+    try {
+      await axios.patch(`${API_URL}/api/inventory/reconciliations/${getRowId(row)}/approve`);
+      setMessage("Reconciliation approved and ledger adjusted.");
+      await loadActiveTab();
+      await loadSupportingData();
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Unable to approve reconciliation.");
+    }
   };
 
   const openEdit = (row) => {
@@ -384,9 +489,10 @@ export default function InventorySystem() {
       const payload = buildPayload(activeTab, form);
       const id = editingRow ? getRowId(editingRow) : "";
       const method = editingRow ? "put" : "post";
+      const createEndpoint = activeTab === "recipes" ? "/api/recipes/versions" : activeConfig.endpoint;
       const url = editingRow
         ? `${API_URL}${activeConfig.endpoint}/${id}`
-        : `${API_URL}${activeConfig.endpoint}`;
+        : `${API_URL}${createEndpoint}`;
 
       await axios[method](url, payload);
       setMessage(editingRow ? "Updated successfully." : "Created successfully.");
@@ -488,6 +594,9 @@ export default function InventorySystem() {
 
   const columns = useMemo(() => getColumns(activeTab), [activeTab]);
   const modalTitle = `${editingRow ? "Edit" : "Add"} ${activeConfig.label}`;
+  const displayedRows = ["raw", "prep", "packaging", "wastage", "suppliers", "purchase-orders"].includes(activeTab)
+    ? rows
+    : hybridRows;
 
   return (
     <div style={page}>
@@ -515,9 +624,11 @@ export default function InventorySystem() {
           <button type="button" style={secondaryButton} onClick={exportRows}>
             Export
           </button>
-          <button type="button" style={primaryButton} onClick={openCreate}>
-            Add {activeConfig.label.replace(/s$/, "")}
-          </button>
+          {EMPTY_FORMS[activeTab] ? (
+            <button type="button" style={primaryButton} onClick={openCreate}>
+              {getPrimaryActionLabel(activeTab, activeConfig.label)}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -568,21 +679,31 @@ export default function InventorySystem() {
         </button>
       </div>
 
+      {activeTab === "movements" ? (
+        <MovementFilterBar filters={movementFilters} setFilters={setMovementFilters} onRefresh={loadActiveTab} />
+      ) : null}
+
       {message ? <div style={successBanner}>{message}</div> : null}
       {error ? <div style={errorBanner}>{error}</div> : null}
 
-      <InventoryTable
-        activeTab={activeTab}
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        isNarrow={isNarrow}
-        onEdit={openEdit}
-        onDelete={deleteRow}
-        onView={(row) => setViewingRow(row)}
-        onReceivePO={(row) => updatePOStatus(row, "DELIVERED")}
-        onInlineRawUpdate={saveInlineRaw}
-      />
+      {renderHybridPanel({
+        activeTab,
+        rows: displayedRows,
+        loading,
+        isNarrow,
+        columns,
+        supporting,
+        menuItems,
+        metrics,
+        onEdit: openEdit,
+        onDelete: deleteRow,
+        onView: (row) => setViewingRow(row),
+        onReceivePO: (row) => updatePOStatus(row, "DELIVERED"),
+        onInlineRawUpdate: saveInlineRaw,
+        onAcknowledgeAlert: acknowledgeAlert,
+        onApproveReconciliation: approveReconciliation,
+        onCreatePO: createRecommendationPO
+      })}
 
       {activeTab === "wastage" && rows.length ? (
         <WastageCharts metrics={metrics} />
@@ -595,6 +716,7 @@ export default function InventorySystem() {
           form={form}
           setForm={setForm}
           supporting={supporting}
+          menuItems={menuItems}
           saving={saving}
           onClose={closeModal}
           onSave={saveForm}
@@ -606,7 +728,126 @@ export default function InventorySystem() {
   );
 }
 
+function normalizeTabRows(tab, payload = {}) {
+  if (tab === "alerts") return payload.alerts || payload.data || [];
+  if (tab === "suggestions") return payload.suggestions || payload.data || [];
+  if (tab === "intelligence" || tab === "ops") return payload.items || payload.data || [];
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+function buildTabMetrics(tab, payload = {}, rows = []) {
+  if (payload.metrics) return payload.metrics;
+  if (tab === "movements") {
+    return {
+      total: payload.pagination?.total || rows.length,
+      purchases: rows.filter((row) => row.movementType === "purchase").length,
+      deductions: rows.filter((row) => row.movementType === "order_deduction").length,
+      adjustments: rows.filter((row) => ["adjustment", "reconciliation_adjustment"].includes(row.movementType)).length
+    };
+  }
+  if (tab === "recipes") {
+    const costs = rows.map((row) => toNumber(row.costing?.unitCost || row.costing?.totalCost)).filter(Boolean);
+    return {
+      totalRecipes: rows.length,
+      activeVersions: rows.filter((row) => row.active !== false).length,
+      mappedVariants: rows.filter((row) => row.variantName || row.variantId).length,
+      avgCost: costs.length ? costs.reduce((sum, value) => sum + value, 0) / costs.length : 0
+    };
+  }
+  if (tab === "reconciliation") {
+    const varianceItems = rows.flatMap((row) => row.items || []).filter((item) => toNumber(item.variance) !== 0);
+    return {
+      pending: rows.filter((row) => row.status === "pending").length,
+      approved: rows.filter((row) => row.status === "approved").length,
+      variance: varianceItems.length,
+      varianceCost: varianceItems.reduce((sum, item) => sum + Math.abs(toNumber(item.variance)), 0)
+    };
+  }
+  if (tab === "alerts") {
+    return {
+      open: rows.filter((row) => !row.acknowledged).length,
+      critical: rows.filter((row) => row.severity === "critical").length,
+      warnings: rows.filter((row) => row.severity === "warning").length,
+      acknowledged: rows.filter((row) => row.acknowledged).length
+    };
+  }
+  if (tab === "suggestions") {
+    return {
+      recommendations: rows.length,
+      estimatedValue: rows.reduce((sum, row) => sum + toNumber(row.recommendedQuantity) * toNumber(row.costPerUnit), 0),
+      suppliers: new Set(rows.map((row) => String(row.supplierId || "")).filter(Boolean)).size,
+      urgent: rows.filter((row) => toNumber(row.currentStock) <= 0).length
+    };
+  }
+  if (tab === "intelligence" || tab === "ops") {
+    return {
+      ...(payload.totals || {}),
+      lowStock: payload.lowStock || 0,
+      negativeStock: payload.negativeStock || 0,
+      stockValue: payload.totals?.stockValue || 0,
+      rawMaterials: payload.totals?.rawMaterials || 0
+    };
+  }
+  return {};
+}
+
+function getPrimaryActionLabel(tab, label) {
+  if (tab === "recipes") return "Add Recipe Version";
+  if (tab === "reconciliation") return "Start Blind Count";
+  if (["movements", "alerts", "suggestions", "intelligence", "ops"].includes(tab)) return "Add Stock Item";
+  return `Add ${label.replace(/s$/, "")}`;
+}
+
 function getColumns(tab) {
+  if (tab === "recipes") {
+    return [
+      { key: "menuItem", label: "Menu Item" },
+      { key: "variantName", label: "Variant" },
+      { key: "version", label: "Version" },
+      { key: "ingredients", label: "Ingredients" },
+      { key: "costing", label: "Cost" },
+      { key: "active", label: "Status" }
+    ];
+  }
+  if (tab === "movements") {
+    return [
+      { key: "createdAt", label: "Time" },
+      { key: "movementType", label: "Movement" },
+      { key: "itemType", label: "Type" },
+      { key: "quantity", label: "Qty" },
+      { key: "costPerUnit", label: "Cost / Unit" },
+      { key: "referenceType", label: "Reference" },
+      { key: "stockAfter", label: "Stock After" }
+    ];
+  }
+  if (tab === "reconciliation") {
+    return [
+      { key: "date", label: "Date" },
+      { key: "status", label: "Status" },
+      { key: "items", label: "Items" },
+      { key: "variance", label: "Variance Items" },
+      { key: "approvedBy", label: "Approved By" }
+    ];
+  }
+  if (tab === "alerts") {
+    return [
+      { key: "severity", label: "Severity" },
+      { key: "type", label: "Type" },
+      { key: "title", label: "Alert" },
+      { key: "itemType", label: "Item Type" },
+      { key: "acknowledged", label: "Status" }
+    ];
+  }
+  if (tab === "suggestions") {
+    return [
+      { key: "itemName", label: "Item" },
+      { key: "recommendedQuantity", label: "Suggested Qty" },
+      { key: "currentStock", label: "Current Stock" },
+      { key: "avgDailyUsage", label: "Avg Daily Usage" },
+      { key: "supplierId", label: "Supplier" }
+    ];
+  }
   if (tab === "raw") {
     return [
       { key: "name", label: "Item Name" },
@@ -762,6 +1003,278 @@ function InventoryTable({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function renderHybridPanel({
+  activeTab,
+  rows,
+  loading,
+  isNarrow,
+  columns,
+  supporting,
+  menuItems,
+  metrics,
+  onEdit,
+  onDelete,
+  onView,
+  onReceivePO,
+  onInlineRawUpdate,
+  onAcknowledgeAlert,
+  onApproveReconciliation,
+  onCreatePO
+}) {
+  if (activeTab === "intelligence") {
+    return <CostIntelligenceDashboard metrics={metrics} rows={rows} />;
+  }
+  if (activeTab === "ops") {
+    return <OperationsDashboard metrics={metrics} supporting={supporting} rows={rows} />;
+  }
+  if (activeTab === "alerts") {
+    return <AlertCenter rows={rows} loading={loading} onAcknowledge={onAcknowledgeAlert} onView={onView} />;
+  }
+  if (activeTab === "suggestions") {
+    return <PurchaseSuggestionsPanel rows={rows} loading={loading} onCreatePO={onCreatePO} />;
+  }
+  if (activeTab === "reconciliation") {
+    return (
+      <ReconciliationPanel
+        rows={rows}
+        loading={loading}
+        isNarrow={isNarrow}
+        onView={onView}
+        onApprove={onApproveReconciliation}
+      />
+    );
+  }
+  if (activeTab === "movements") {
+    return <MovementTimeline rows={rows} loading={loading} />;
+  }
+  if (activeTab === "recipes") {
+    return <RecipeManagementPanel rows={rows} loading={loading} menuItems={menuItems} onView={onView} />;
+  }
+
+  return (
+    <InventoryTable
+      activeTab={activeTab}
+      columns={columns}
+      rows={rows}
+      loading={loading}
+      isNarrow={isNarrow}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onView={onView}
+      onReceivePO={onReceivePO}
+      onInlineRawUpdate={onInlineRawUpdate}
+    />
+  );
+}
+
+function MovementFilterBar({ filters, setFilters, onRefresh }) {
+  const setField = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
+  return (
+    <div style={filterStrip}>
+      <select value={filters.movementType} onChange={(event) => setField("movementType", event.target.value)} style={selectInput}>
+        {(STATUS_FILTERS.movements || []).map((option) => (
+          <option key={option} value={option}>{formatLabel(option)}</option>
+        ))}
+      </select>
+      <select value={filters.itemType} onChange={(event) => setField("itemType", event.target.value)} style={selectInput}>
+        {["ALL", "raw_material", "prep_item", "packaging"].map((option) => (
+          <option key={option} value={option}>{formatLabel(option)}</option>
+        ))}
+      </select>
+      <input type="date" value={filters.from} onChange={(event) => setField("from", event.target.value)} style={searchInput} />
+      <input type="date" value={filters.to} onChange={(event) => setField("to", event.target.value)} style={searchInput} />
+      <button type="button" style={secondaryButton} onClick={onRefresh}>Apply</button>
+    </div>
+  );
+}
+
+function MovementTimeline({ rows, loading }) {
+  if (loading) return <div style={emptyState}>Loading movement history...</div>;
+  if (!rows.length) return <div style={emptyState}>No inventory movements found.</div>;
+  return (
+    <div style={timelineShell}>
+      {rows.map((row) => (
+        <div key={getRowId(row)} style={timelineItem}>
+          <div style={timelineDot} />
+          <div style={timelineBody}>
+            <div style={sectionLine}>
+              <strong>{formatLabel(row.movementType)}</strong>
+              <span style={mutedText}>{formatDate(row.createdAt)}</span>
+            </div>
+            <div style={timelineMeta}>
+              <StatusBadge label={row.itemType} />
+              <span>{toNumber(row.quantity)} {row.unit}</span>
+              <span>{formatCurrency(row.totalCost)}</span>
+              <span>After: {toNumber(row.stockAfter)} {row.unit}</span>
+            </div>
+            {row.notes ? <p style={timelineNote}>{row.notes}</p> : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RecipeManagementPanel({ rows, loading, onView }) {
+  if (loading) return <div style={emptyState}>Loading recipes...</div>;
+  return (
+    <div style={splitGrid}>
+      <div style={panelCard}>
+        <h3 style={chartTitle}>Recipe List</h3>
+        {rows.length ? rows.map((recipe) => (
+          <div key={getRowId(recipe)} style={listRow}>
+            <div>
+              <strong>{recipe.menuItem || recipe.menuItemId || "Recipe"}</strong>
+              <div style={mutedText}>{recipe.variantName || "Default variant"} · v{recipe.version || 1}</div>
+            </div>
+            <button type="button" style={smallButton} onClick={() => onView(recipe)}>History</button>
+          </div>
+        )) : <div style={emptyState}>No recipe versions yet. Add the first recipe version.</div>}
+      </div>
+      <div style={panelCard}>
+        <h3 style={chartTitle}>Recipe Cost Breakdown</h3>
+        {rows.slice(0, 6).map((recipe) => (
+          <div key={`cost-${getRowId(recipe)}`} style={costRow}>
+            <span>{recipe.menuItem || recipe.variantName || "Recipe"}</span>
+            <strong>{formatCurrency(recipe.costing?.unitCost || recipe.costing?.totalCost || 0)}</strong>
+          </div>
+        ))}
+        {!rows.length ? <div style={mutedText}>Costing appears once versions are created.</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function ReconciliationPanel({ rows, loading, isNarrow, onView, onApprove }) {
+  if (loading) return <div style={emptyState}>Loading reconciliations...</div>;
+  if (!rows.length) return <div style={emptyState}>No counts yet. Start a blind stock count from Add Reconciliation.</div>;
+  return (
+    <div style={isNarrow ? cardGrid : tableShell}>
+      {isNarrow ? rows.map((row) => (
+        <div key={getRowId(row)} style={mobileCard}>
+          <div style={mobileCardTop}><strong>{formatDate(row.date)}</strong><StatusBadge label={row.status} /></div>
+          <div style={mutedText}>{(row.items || []).length} counted items</div>
+          <ActionReconciliation row={row} onView={onView} onApprove={onApprove} />
+        </div>
+      )) : (
+        <table style={table}>
+          <thead><tr><th style={tableHead}>Date</th><th style={tableHead}>Status</th><th style={tableHead}>Items</th><th style={tableHead}>Variance</th><th style={tableHead}>Actions</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={getRowId(row)} style={tableRow}>
+            <td style={tableCell}>{formatDate(row.date)}</td>
+            <td style={tableCell}><StatusBadge label={row.status} /></td>
+            <td style={tableCell}>{(row.items || []).length}</td>
+            <td style={tableCell}>{(row.items || []).filter((item) => toNumber(item.variance) !== 0).length}</td>
+            <td style={tableCell}><ActionReconciliation row={row} onView={onView} onApprove={onApprove} /></td>
+          </tr>)}</tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function ActionReconciliation({ row, onView, onApprove }) {
+  return (
+    <div style={actionRow}>
+      <button type="button" style={smallButton} onClick={() => onView(row)}>Variance</button>
+      {row.status === "pending" ? <button type="button" style={smallButtonDark} onClick={() => onApprove(row)}>Approve</button> : null}
+    </div>
+  );
+}
+
+function AlertCenter({ rows, loading, onAcknowledge, onView }) {
+  if (loading) return <div style={emptyState}>Loading alerts...</div>;
+  const groups = ["critical_low_stock", "negative_stock", "abnormal_variance", "excessive_wastage", "expiring_soon", "excessive_overrides", "low_stock"];
+  return (
+    <div style={alertGrid}>
+      {groups.map((group) => {
+        const groupRows = rows.filter((row) => row.type === group);
+        return (
+          <div key={group} style={panelCard}>
+            <h3 style={chartTitle}>{formatLabel(group)}</h3>
+            {groupRows.length ? groupRows.map((alert) => (
+              <div key={getRowId(alert)} style={alertRow}>
+                <div>
+                  <StatusBadge label={alert.severity} />
+                  <strong style={{ display: "block", marginTop: 6 }}>{alert.title}</strong>
+                  <div style={mutedText}>{alert.message || formatLabel(alert.itemType)}</div>
+                </div>
+                <div style={actionRow}>
+                  <button type="button" style={smallButton} onClick={() => onView(alert)}>View</button>
+                  {!alert.acknowledged ? <button type="button" style={smallButtonDark} onClick={() => onAcknowledge(alert)}>Ack</button> : null}
+                </div>
+              </div>
+            )) : <div style={mutedText}>Clear</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PurchaseSuggestionsPanel({ rows, loading, onCreatePO }) {
+  if (loading) return <div style={emptyState}>Calculating purchase suggestions...</div>;
+  if (!rows.length) return <div style={emptyState}>No purchase recommendations right now.</div>;
+  return (
+    <div style={tableShell}>
+      <table style={table}>
+        <thead><tr><th style={tableHead}>Item</th><th style={tableHead}>Suggested</th><th style={tableHead}>Current</th><th style={tableHead}>Avg/day</th><th style={tableHead}>Supplier</th><th style={tableHead}>Action</th></tr></thead>
+        <tbody>{rows.map((row) => <tr key={`${row.itemType}-${row.itemId}`} style={tableRow}>
+          <td style={tableCell}><strong>{row.itemName}</strong><div style={mutedText}>{formatLabel(row.itemType)}</div></td>
+          <td style={tableCell}>{toNumber(row.recommendedQuantity)} {row.unit}</td>
+          <td style={tableCell}>{toNumber(row.currentStock)} {row.unit}</td>
+          <td style={tableCell}>{toNumber(row.avgDailyUsage)} {row.unit}</td>
+          <td style={tableCell}>{row.supplierId ? String(row.supplierId).slice(-6).toUpperCase() : "Unassigned"}</td>
+          <td style={tableCell}><button type="button" style={smallButtonDark} onClick={() => onCreatePO(row)}>Create PO</button></td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function CostIntelligenceDashboard({ metrics, rows }) {
+  return (
+    <div style={splitGrid}>
+      <div style={panelCard}>
+        <h3 style={chartTitle}>Dish Profitability</h3>
+        <p style={mutedText}>Historical order cost snapshots are stored on orders for stable profitability reporting.</p>
+        {(rows || []).slice(0, 5).map((row) => <div key={getRowId(row)} style={costRow}><span>{row.name || row.itemName}</span><strong>{formatCurrency(row.costPerUnit || row.pricePerUnit || 0)}</strong></div>)}
+      </div>
+      <div style={panelCard}>
+        <h3 style={chartTitle}>Cost Impact</h3>
+        <div style={kpiGrid}>
+          <MetricCard label="Stock Value" value={formatCurrency(metrics.stockValue)} />
+          <MetricCard label="Low Stock" value={metrics.lowStock || 0} />
+          <MetricCard label="Negative Stock" value={metrics.negativeStock || 0} />
+          <MetricCard label="Raw Materials" value={metrics.rawMaterials || 0} />
+        </div>
+      </div>
+      <div style={panelCard}>
+        <h3 style={chartTitle}>Most Expensive Ingredients</h3>
+        {(rows || []).sort((a, b) => toNumber(b.costPerUnit || b.pricePerUnit) - toNumber(a.costPerUnit || a.pricePerUnit)).slice(0, 8).map((row) => (
+          <div key={`exp-${getRowId(row)}`} style={costRow}><span>{row.name || row.itemName}</span><strong>{formatCurrency(row.costPerUnit || row.pricePerUnit)}</strong></div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OperationsDashboard({ metrics, supporting }) {
+  const expiringItems = [...(supporting.raw || []), ...(supporting.prep || [])].filter((item) => {
+    const value = item.expiryDate || item.expiryAt;
+    if (!value) return false;
+    const diff = new Date(value).getTime() - Date.now();
+    return diff > 0 && diff <= 72 * 60 * 60 * 1000;
+  });
+  const topLow = [...(supporting.raw || []), ...(supporting.packaging || [])].filter((item) => toNumber(item.currentStock ?? item.stock) <= toNumber(item.minStock)).slice(0, 8);
+  return (
+    <div style={splitGrid}>
+      <div style={panelCard}><h3 style={chartTitle}>Kitchen Operations</h3><div style={kpiGrid}><MetricCard label="Low Stock" value={metrics.lowStock || topLow.length} /><MetricCard label="Expiring Items" value={expiringItems.length} /><MetricCard label="Override Count" value={metrics.overrideCount || 0} /><MetricCard label="Recommendations" value={metrics.recommendations || 0} /></div></div>
+      <div style={panelCard}><h3 style={chartTitle}>Low Stock Queue</h3>{topLow.map((item) => <div key={getRowId(item)} style={costRow}><span>{item.name}</span><strong>{toNumber(item.currentStock ?? item.stock)} {item.unit}</strong></div>)}</div>
+      <div style={panelCard}><h3 style={chartTitle}>Expiring Soon</h3>{expiringItems.map((item) => <div key={`expiring-${getRowId(item)}`} style={costRow}><span>{item.name}</span><strong>{formatDate(item.expiryDate || item.expiryAt)}</strong></div>)}</div>
     </div>
   );
 }
@@ -942,7 +1455,7 @@ function MetricCard({ label, value }) {
   );
 }
 
-function EditorModal({ title, activeTab, form, setForm, supporting, saving, onClose, onSave }) {
+function EditorModal({ title, activeTab, form, setForm, supporting, menuItems, saving, onClose, onSave }) {
   return (
     <div style={modalBackdrop} onClick={onClose}>
       <div style={modalCard} onClick={(event) => event.stopPropagation()}>
@@ -952,7 +1465,7 @@ function EditorModal({ title, activeTab, form, setForm, supporting, saving, onCl
             Close
           </button>
         </div>
-        <FormFields activeTab={activeTab} form={form} setForm={setForm} supporting={supporting} />
+        <FormFields activeTab={activeTab} form={form} setForm={setForm} supporting={supporting} menuItems={menuItems} />
         <div style={modalActions}>
           <button type="button" style={secondaryButton} onClick={onClose}>
             Cancel
@@ -966,7 +1479,7 @@ function EditorModal({ title, activeTab, form, setForm, supporting, saving, onCl
   );
 }
 
-function FormFields({ activeTab, form, setForm, supporting }) {
+function FormFields({ activeTab, form, setForm, supporting, menuItems = [] }) {
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
   if (activeTab === "raw") {
@@ -1048,7 +1561,153 @@ function FormFields({ activeTab, form, setForm, supporting }) {
     );
   }
 
+  if (activeTab === "recipes") {
+    return <RecipeBuilder form={form} setForm={setForm} supporting={supporting} menuItems={menuItems} />;
+  }
+
+  if (activeTab === "reconciliation") {
+    return <ReconciliationCountBuilder form={form} setForm={setForm} supporting={supporting} />;
+  }
+
   return <POEditor form={form} setForm={setForm} supporting={supporting} />;
+}
+
+function RecipeBuilder({ form, setForm, supporting, menuItems }) {
+  const selectedMenu = menuItems.find((item) => getRowId(item) === String(form.menuItemId || ""));
+  const ingredientOptions = (line) => line.ingredientType === "prep_item" ? supporting.prep : supporting.raw;
+  const updateLine = (index, key, value) => {
+    setForm((current) => ({
+      ...current,
+      ingredients: current.ingredients.map((line, lineIndex) => {
+        if (lineIndex !== index) return line;
+        const nextLine = { ...line, [key]: value };
+        if (key === "ingredientType") {
+          nextLine.ingredientId = "";
+          nextLine.unit = value === "prep_item" ? "kg" : "kg";
+        }
+        if (key === "ingredientId") {
+          const selected = ingredientOptions(nextLine).find((item) => getRowId(item) === value);
+          nextLine.unit = selected?.unit || nextLine.unit;
+        }
+        return nextLine;
+      })
+    }));
+  };
+  const estimatedCost = (form.ingredients || []).reduce((sum, line) => {
+    const item = ingredientOptions(line).find((entry) => getRowId(entry) === String(line.ingredientId || ""));
+    const unitCost = toNumber(item?.costPerUnit ?? item?.pricePerUnit ?? item?.cost);
+    return sum + toNumber(line.quantity) * unitCost;
+  }, 0);
+
+  return (
+    <div style={formGrid}>
+      <SelectField
+        label="Menu Item"
+        value={form.menuItemId}
+        onChange={(value) => {
+          const menu = menuItems.find((item) => getRowId(item) === value);
+          setForm((current) => ({ ...current, menuItemId: value, menuItem: menu?.name || current.menuItem }));
+        }}
+        options={menuItems}
+      />
+      <SelectStatic
+        label="Variant"
+        value={form.variantName}
+        onChange={(value) => setForm((current) => ({ ...current, variantName: value, variantId: value }))}
+        options={["", ...(selectedMenu?.variants || []).map((variant) => variant.name)].map((value) => value || "Default")}
+      />
+      <Field label="Yield Qty" value={form.yieldQuantity} onChange={(value) => setForm((current) => ({ ...current, yieldQuantity: value }))} />
+      <Field label="Prep Loss %" value={form.preparationLossPercent} onChange={(value) => setForm((current) => ({ ...current, preparationLossPercent: value }))} />
+      <div style={wideField}>
+        <div style={sectionLine}>
+          <strong>Ingredients</strong>
+          <strong>{formatCurrency(estimatedCost)} live cost</strong>
+          <button
+            type="button"
+            style={smallButton}
+            onClick={() => setForm((current) => ({
+              ...current,
+              ingredients: [...current.ingredients, { ingredientId: "", ingredientType: "raw_material", quantity: "", unit: "kg", isCritical: true }]
+            }))}
+          >
+            Add Ingredient
+          </button>
+        </div>
+        {(form.ingredients || []).map((line, index) => (
+          <div key={`recipe-line-${index}`} style={recipeLineGrid}>
+            <SelectStatic label="Type" value={line.ingredientType} onChange={(value) => updateLine(index, "ingredientType", value)} options={["raw_material", "prep_item"]} />
+            <SelectField label="Ingredient" value={line.ingredientId} onChange={(value) => updateLine(index, "ingredientId", value)} options={ingredientOptions(line)} />
+            <Field label="Qty" value={line.quantity} onChange={(value) => updateLine(index, "quantity", value)} />
+            <Field label="Unit" value={line.unit} onChange={(value) => updateLine(index, "unit", value)} />
+            <label style={checkboxField}>
+              <input type="checkbox" checked={line.isCritical !== false} onChange={(event) => updateLine(index, "isCritical", event.target.checked)} />
+              Critical
+            </label>
+            <button
+              type="button"
+              style={smallButtonDanger}
+              onClick={() => setForm((current) => ({ ...current, ingredients: current.ingredients.filter((_, lineIndex) => lineIndex !== index) }))}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReconciliationCountBuilder({ form, setForm, supporting }) {
+  const sourceItems = [
+    ...(supporting.raw || []).map((item) => ({ ...item, itemType: "raw_material", stockLabel: item.currentStock })),
+    ...(supporting.prep || []).map((item) => ({ ...item, itemType: "prep_item", stockLabel: item.quantity })),
+    ...(supporting.packaging || []).map((item) => ({ ...item, itemType: "packaging", stockLabel: item.stock }))
+  ];
+  const countRows = form.items?.length
+    ? form.items
+    : sourceItems.map((item) => ({ itemId: getRowId(item), itemType: item.itemType, itemName: item.name, countedQty: "", notes: "" }));
+  const updateLine = (index, key, value) => {
+    setForm((current) => ({
+      ...current,
+      items: countRows.map((line, lineIndex) => lineIndex === index ? { ...line, [key]: value } : line)
+    }));
+  };
+
+  return (
+    <div style={formGrid}>
+      <Field label="Count Date" type="date" value={form.date} onChange={(value) => setForm((current) => ({ ...current, date: value }))} />
+      <Field label="Notes" value={form.notes} onChange={(value) => setForm((current) => ({ ...current, notes: value }))} />
+      <div style={wideField}>
+        <div style={sectionLine}>
+          <strong>Blind count</strong>
+          <span style={mutedText}>Expected stock is hidden during count.</span>
+        </div>
+        <div style={compactList}>
+          {countRows.map((line, index) => (
+            <div key={`${line.itemType}-${line.itemId}`} style={countRow}>
+              <div>
+                <strong>{line.itemName}</strong>
+                <div style={mutedText}>{formatLabel(line.itemType)}</div>
+              </div>
+              <input
+                value={line.countedQty || ""}
+                onChange={(event) => updateLine(index, "countedQty", event.target.value)}
+                placeholder="Counted qty"
+                style={fieldInput}
+                inputMode="decimal"
+              />
+              <input
+                value={line.notes || ""}
+                onChange={(event) => updateLine(index, "notes", event.target.value)}
+                placeholder="Note"
+                style={fieldInput}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function UsageEditor({ form, setForm, rawItems }) {
@@ -1351,10 +2010,77 @@ function buildFormFromRow(tab, row = {}) {
           : [{ type: "raw", itemId: "", itemName: "", qty: "", unit: "kg", cost: "" }]
     };
   }
+  if (tab === "recipes") {
+    return {
+      ...EMPTY_FORMS.recipes,
+      menuItemId: row.menuItemId || "",
+      menuItem: row.menuItem || "",
+      variantId: row.variantId || "",
+      variantName: row.variantName || "",
+      yieldQuantity: String(row.yieldQuantity ?? 1),
+      preparationLossPercent: String(row.preparationLossPercent ?? 0),
+      ingredients:
+        row.ingredients?.length
+          ? row.ingredients.map((line) => ({
+              ingredientId: line.ingredientId || line.itemId || line.inventoryId || "",
+              ingredientType: line.ingredientType || "raw_material",
+              quantity: String(line.quantity ?? line.quantityPerPack ?? ""),
+              unit: line.unit || "kg",
+              isCritical: line.isCritical !== false
+            }))
+          : [{ ingredientId: "", ingredientType: "raw_material", quantity: "", unit: "kg", isCritical: true }]
+    };
+  }
+  if (tab === "reconciliation") {
+    return {
+      ...EMPTY_FORMS.reconciliation,
+      date: toDateInput(row.date) || new Date().toISOString().slice(0, 10),
+      notes: row.notes || "",
+      items: (row.items || []).map((line) => ({
+        itemId: line.itemId,
+        itemType: line.itemType,
+        itemName: line.itemName,
+        countedQty: String(line.countedQty ?? ""),
+        notes: line.notes || ""
+      }))
+    };
+  }
   return { ...EMPTY_FORMS[tab] };
 }
 
 function buildPayload(tab, form) {
+  if (tab === "recipes") {
+    const variantName = form.variantName === "Default" ? "" : form.variantName;
+    return {
+      menuItemId: form.menuItemId,
+      menuItem: form.menuItem,
+      variantId: form.variantId === "Default" ? "" : (form.variantId || variantName),
+      variantName,
+      yieldQuantity: toNumber(form.yieldQuantity, 1),
+      preparationLossPercent: toNumber(form.preparationLossPercent),
+      ingredients: (form.ingredients || []).map((line) => ({
+        ingredientId: line.ingredientId,
+        ingredientType: line.ingredientType,
+        quantity: toNumber(line.quantity),
+        unit: line.unit || "kg",
+        isCritical: line.isCritical !== false
+      }))
+    };
+  }
+  if (tab === "reconciliation") {
+    return {
+      date: form.date,
+      notes: form.notes,
+      items: (form.items || [])
+        .filter((line) => line.countedQty !== "")
+        .map((line) => ({
+          itemId: line.itemId,
+          itemType: line.itemType,
+          countedQty: toNumber(line.countedQty),
+          notes: line.notes || ""
+        }))
+    };
+  }
   if (tab === "prep") {
     return {
       ...form,
@@ -1834,3 +2560,107 @@ const chartTitle = { margin: "0 0 12px", fontSize: 16, fontWeight: 800 };
 const chartRow = { display: "grid", gridTemplateColumns: "100px 1fr 86px", gap: 8, alignItems: "center", marginBottom: 9, fontSize: 12 };
 const chartTrack = { height: 8, borderRadius: 999, background: "#E5E7EB", overflow: "hidden" };
 const chartBar = { height: "100%", borderRadius: 999, background: "#111111" };
+const filterStrip = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
+  gap: 10,
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  borderRadius: 14,
+  padding: 12,
+  background: "#FFFFFF"
+};
+const timelineShell = {
+  display: "grid",
+  gap: 0,
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  borderRadius: 14,
+  background: "#FFFFFF",
+  boxShadow: cloudKitchenTheme.shadow,
+  padding: "8px 14px"
+};
+const timelineItem = {
+  display: "grid",
+  gridTemplateColumns: "18px 1fr",
+  gap: 12,
+  padding: "12px 0",
+  borderBottom: `1px solid ${cloudKitchenTheme.border}`
+};
+const timelineDot = {
+  width: 10,
+  height: 10,
+  borderRadius: 999,
+  background: "#111111",
+  marginTop: 5
+};
+const timelineBody = { display: "grid", gap: 8 };
+const timelineMeta = { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12 };
+const timelineNote = { margin: 0, color: cloudKitchenTheme.textSecondary, fontSize: 12 };
+const splitGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+  gap: 12
+};
+const panelCard = {
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  borderRadius: 14,
+  background: "#FFFFFF",
+  boxShadow: cloudKitchenTheme.shadow,
+  padding: 14,
+  display: "grid",
+  gap: 12,
+  alignContent: "start"
+};
+const listRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  alignItems: "center",
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  borderRadius: 12,
+  padding: 12
+};
+const costRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  alignItems: "center",
+  borderBottom: `1px solid ${cloudKitchenTheme.border}`,
+  padding: "8px 0",
+  fontSize: 13
+};
+const alertGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+  gap: 12
+};
+const alertRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  alignItems: "center",
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  borderRadius: 12,
+  padding: 12
+};
+const kpiGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+  gap: 10
+};
+const recipeLineGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1.6fr 0.8fr 0.8fr auto auto",
+  gap: 8,
+  alignItems: "end",
+  marginTop: 10
+};
+const compactList = { display: "grid", gap: 8, marginTop: 10 };
+const countRow = {
+  display: "grid",
+  gridTemplateColumns: "1.4fr 1fr 1.2fr",
+  gap: 8,
+  alignItems: "center",
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  borderRadius: 12,
+  padding: 10
+};

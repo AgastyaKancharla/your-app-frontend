@@ -253,6 +253,8 @@ export default function POS() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [shortagePrompt, setShortagePrompt] = useState(null);
+  const [overrideReason, setOverrideReason] = useState("");
   const toggleQuickOrder = useCallback(() => {
     setIsQuickOrder((current) => !current);
   }, []);
@@ -455,7 +457,7 @@ export default function POS() {
     setError("");
   };
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrder = async (override = null) => {
     if (!hasPermission(user, "pos.create", rolePermissions)) {
       setError("You do not have permission to create orders.");
       return;
@@ -544,7 +546,10 @@ export default function POS() {
     try {
       setPlacingOrder(true);
       setError("");
-      const response = await axios.post(`${API_URL}/api/orders`, orderPayload);
+      const response = await axios.post(`${API_URL}/api/orders`, {
+        ...orderPayload,
+        ...(override?.reason ? { inventoryOverrideReason: override.reason, overrideReason: override.reason } : {})
+      });
       const savedOrder = response.data || order;
       addOrder(savedOrder);
       cart.forEach((line) => {
@@ -561,9 +566,28 @@ export default function POS() {
         }
       });
       setNotice(`Order ${savedOrder.invoiceNumber || savedOrder.orderId || order.orderId} created.`);
+      setShortagePrompt(null);
+      setOverrideReason("");
       clearCart();
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Unable to place order. Please try again.");
+      const shortages = requestError.response?.data?.shortages;
+      const canProceed = requestError.response?.data?.canProceed;
+      if (Array.isArray(shortages) && shortages.length && canProceed !== false) {
+        setShortagePrompt({
+          message: requestError.response?.data?.message || "Some ingredients are short.",
+          shortages
+        });
+        setError("");
+      } else if (Array.isArray(shortages) && shortages.length) {
+        setShortagePrompt({
+          message: requestError.response?.data?.message || "Insufficient stock.",
+          shortages,
+          blocked: true
+        });
+        setError("");
+      } else {
+        setError(requestError.response?.data?.message || "Unable to place order. Please try again.");
+      }
     } finally {
       setPlacingOrder(false);
     }
@@ -773,7 +797,7 @@ export default function POS() {
                 ...placeOrderButton,
                 ...(!cart.length || placingOrder ? disabledButton : null)
               }}
-              onClick={handlePlaceOrder}
+              onClick={() => handlePlaceOrder()}
               disabled={!cart.length || placingOrder}
             >
               {placingOrder ? "Placing..." : "Place Order"}
@@ -886,6 +910,67 @@ export default function POS() {
           </div>
         </div>
       ) : null}
+      {shortagePrompt ? (
+        <InventoryShortageSheet
+          prompt={shortagePrompt}
+          reason={overrideReason}
+          setReason={setOverrideReason}
+          placingOrder={placingOrder}
+          onCancel={() => {
+            setShortagePrompt(null);
+            setOverrideReason("");
+          }}
+          onProceed={() => {
+            if (!overrideReason.trim()) {
+              setError("Add an override reason before proceeding.");
+              return;
+            }
+            handlePlaceOrder({ reason: overrideReason.trim() });
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function InventoryShortageSheet({ prompt, reason, setReason, placingOrder, onCancel, onProceed }) {
+  return (
+    <div style={modalBackdrop} onClick={onCancel}>
+      <div style={shortageSheet} onClick={(event) => event.stopPropagation()}>
+        <div style={modalTop}>
+          <div>
+            <h2 style={modalTitle}>Inventory Shortage</h2>
+            <p style={modalSubtitle}>{prompt.message}</p>
+          </div>
+          <button type="button" style={clearButton} onClick={onCancel}>Cancel</button>
+        </div>
+        <div style={shortageList}>
+          {(prompt.shortages || []).map((shortage) => (
+            <div key={`${shortage.itemType}-${shortage.itemId}`} style={shortageRow}>
+              <strong>{shortage.itemName}</strong>
+              <span>Required: {toNumber(shortage.required)} {shortage.unit}</span>
+              <span>Available: {toNumber(shortage.available)} {shortage.unit}</span>
+            </div>
+          ))}
+        </div>
+        {!prompt.blocked ? (
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Override reason"
+            style={overrideInput}
+            rows={3}
+          />
+        ) : null}
+        <div style={shortageActions}>
+          <button type="button" style={clearButton} onClick={onCancel}>Cancel</button>
+          {!prompt.blocked ? (
+            <button type="button" style={placeOrderButton} onClick={onProceed} disabled={placingOrder}>
+              {placingOrder ? "Placing..." : "Proceed Anyway"}
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1595,4 +1680,48 @@ const activeOptionButton = {
   background: "#111111",
   color: "#FFFFFF",
   borderColor: "#111111"
+};
+
+const shortageSheet = {
+  width: "min(560px, 100%)",
+  maxHeight: "92vh",
+  overflowY: "auto",
+  background: "#FFFFFF",
+  borderRadius: 10,
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  boxShadow: "0 24px 80px rgba(15, 23, 42, 0.22)",
+  padding: 18,
+  display: "grid",
+  gap: 14
+};
+
+const shortageList = {
+  display: "grid",
+  gap: 8
+};
+
+const shortageRow = {
+  display: "grid",
+  gridTemplateColumns: "1.2fr 1fr 1fr",
+  gap: 8,
+  alignItems: "center",
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  borderRadius: 8,
+  padding: 10,
+  fontSize: 13
+};
+
+const overrideInput = {
+  width: "100%",
+  borderRadius: 8,
+  border: `1px solid ${cloudKitchenTheme.border}`,
+  padding: 10,
+  resize: "vertical",
+  outline: "none"
+};
+
+const shortageActions = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10
 };
