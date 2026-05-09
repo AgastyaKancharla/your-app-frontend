@@ -7,6 +7,7 @@ import { cloudKitchenTheme } from "../../theme";
 import { connectOrdersSocket, formatCurrency } from "./cloudKitchenUtils";
 
 const ACTIVE_TENANT_STORAGE_KEY = "restaurant_crm_active_tenant_id";
+const INVENTORY_UNITS = ["ltr", "kg", "grm", "piece"];
 
 const TABS = [
   { key: "raw", label: "Raw Materials", endpoint: "/api/inventory/raw" },
@@ -228,6 +229,23 @@ const STATUS_FILTERS = {
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeInventoryUnit = (unit = "") => {
+  const value = String(unit || "").trim().toLowerCase();
+  if (["g", "gm", "gram", "grams", "grm"].includes(value)) return "grm";
+  if (["l", "lt", "liter", "litre", "liters", "litres", "ltr"].includes(value)) return "ltr";
+  if (["pcs", "pc", "piece", "pieces"].includes(value)) return "piece";
+  return value || "kg";
+};
+
+const getStockValueQuantity = (quantity, unit) =>
+  normalizeInventoryUnit(unit) === "grm" ? toNumber(quantity) / 1000 : toNumber(quantity);
+
+const calculateStockValue = (row = {}) => {
+  const quantity = row.currentStock ?? row.quantity ?? row.stock;
+  const costPerUnit = row.costPerUnit ?? row.pricePerUnit ?? row.purchasePrice;
+  return getStockValueQuantity(quantity, row.unit) * toNumber(costPerUnit);
 };
 
 const toDateInput = (value) => {
@@ -737,7 +755,15 @@ function normalizeTabRows(tab, payload = {}) {
 }
 
 function buildTabMetrics(tab, payload = {}, rows = []) {
-  if (payload.metrics) return payload.metrics;
+  if (payload.metrics) {
+    if (tab === "raw") {
+      return {
+        ...payload.metrics,
+        totalStockValue: rows.reduce((sum, row) => sum + calculateStockValue(row), 0)
+      };
+    }
+    return payload.metrics;
+  }
   if (tab === "movements") {
     return {
       total: payload.pagination?.total || rows.length,
@@ -856,6 +882,7 @@ function getColumns(tab) {
       { key: "currentStock", label: "Current Stock" },
       { key: "minStock", label: "Min Stock" },
       { key: "costPerUnit", label: "Cost / Unit" },
+      { key: "stockValue", label: "Item Value" },
       { key: "supplierName", label: "Supplier" },
       { key: "expiryDate", label: "Expiry Date" },
       { key: "status", label: "Status" }
@@ -1303,6 +1330,7 @@ function renderCell(activeTab, row, key, onInlineRawUpdate) {
   }
 
   if (key === "status") return <RowStatus activeTab={activeTab} row={row} />;
+  if (key === "stockValue") return formatCurrency(calculateStockValue(row));
   if (key === "expiryDate" || key === "expiryAt") return <ExpiryIndicator value={row[key]} />;
   if (key === "supplierName") return <SupplierBadge value={row.supplierName} />;
   if (["costPerUnit", "cost", "value", "totalAmount"].includes(key)) return formatCurrency(row[key]);
@@ -1319,6 +1347,8 @@ function renderCell(activeTab, row, key, onInlineRawUpdate) {
 
 function renderCellValue(_activeTab, row, key) {
   if (key === "status") return formatLabel(row.status);
+  if (key === "stockValue") return formatCurrency(calculateStockValue(row));
+  if (key === "unit") return normalizeInventoryUnit(row.unit);
   if (key === "isActive") return row.isActive === false ? "Inactive" : "Active";
   if (key === "items") return `${(row.items || row.lines || []).length} lines`;
   if (key === "createdAt" || key === "preparedAt" || key === "expectedDelivery") return formatDate(row[key]);
@@ -1487,7 +1517,7 @@ function FormFields({ activeTab, form, setForm, supporting, menuItems = [] }) {
       <div style={formGrid}>
         <Field label="Name" value={form.name} onChange={(value) => setField("name", value)} />
         <Field label="Category" value={form.category} onChange={(value) => setField("category", value)} />
-        <Field label="Unit" value={form.unit} onChange={(value) => setField("unit", value)} />
+        <SelectStatic label="Unit" value={form.unit} onChange={(value) => setField("unit", value)} options={INVENTORY_UNITS} />
         <Field label="Current Stock" value={form.currentStock} onChange={(value) => setField("currentStock", value)} />
         <Field label="Min Stock" value={form.minStock} onChange={(value) => setField("minStock", value)} />
         <Field label="Cost per Unit" value={form.costPerUnit} onChange={(value) => setField("costPerUnit", value)} />
@@ -1930,7 +1960,7 @@ function buildFormFromRow(tab, row = {}) {
       ...EMPTY_FORMS.raw,
       name: row.name || "",
       category: row.category || "General",
-      unit: row.unit || "kg",
+      unit: normalizeInventoryUnit(row.unit),
       currentStock: String(row.currentStock ?? row.quantity ?? ""),
       minStock: String(row.minStock ?? ""),
       costPerUnit: String(row.costPerUnit ?? row.pricePerUnit ?? ""),
@@ -2129,7 +2159,7 @@ function buildPayload(tab, form) {
       ...acc,
       [key]: toNumber(form[key])
     }),
-    { ...form }
+    { ...form, unit: form.unit ? normalizeInventoryUnit(form.unit) : form.unit }
   );
 }
 
